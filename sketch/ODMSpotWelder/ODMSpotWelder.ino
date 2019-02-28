@@ -51,7 +51,7 @@ void loop() {
     delay(debouncepause);
     weld();
   }
-  menudisplay(); //aggiunto per aggiornare la temperatura}
+  menudisplay();
 }
 
 void menuchange() {
@@ -78,7 +78,7 @@ void menudisplay()  {
   delay (200);
 }
 
-void weld() { // This function activates the solid state relay based on your menu selection
+void weld() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Welding...");
@@ -109,10 +109,8 @@ void cooldown() {
 
 double Thermistor(int RawADC) {
   double Temp;
-  Temp = log(10000.0 * ((1024.0 / RawADC - 1)));
-  //         =log(10000.0/(1024.0/RawADC-1)) // for pull-up configuration
+  Temp = log(10000.0 * ((1024.0 / RawADC - 1))); // log(10000.0 / (1024.0 / RawADC - 1))) for pull-up configuration
   Temp = 1 / (0.001129148 + (0.000234125 + (0.0000000876741 * Temp * Temp )) * Temp );
-  Temp = Temp - 273.15;            // Convert Kelvin to Celcius
-  // Temp = (Temp * 9.0)/ 5.0 + 32.0; // Convert Celcius to Fahrenheit
+  Temp = Temp - 273.15; // Convert Kelvin to Celsius - Temp = (Temp * 9.0)/ 5.0 + 32.0; for convert Celsius to Fahrenheit
   return Temp;
 }
