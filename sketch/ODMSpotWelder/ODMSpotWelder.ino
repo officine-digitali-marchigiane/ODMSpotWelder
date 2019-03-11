@@ -32,17 +32,16 @@ void setup() {
   maxweldpulse = (maxweldpulse - weldtimeincrement);
   weldtime = weldtimeincrement;
   lcd.begin(16, 2);
-  //  lcd.backlight();
-  //  menudisplay();
+  menudisplay();
 }
 
 void loop() {
 #ifdef DEBUG_MODE
   Serial.println(Thermistor(analogRead(thermpin)));
 #endif
-  //if (int(Thermistor(analogRead(thermpin))) >= cutofftemp)  {
-  //  cooldown();
-  //}
+  if (round(Thermistor(analogRead(thermpin))) >= cutofftemp)  {
+    cooldown();
+  }
   if (digitalRead(menupin) == LOW)  {
     delay(debouncepause);
     menuchange();
@@ -65,17 +64,17 @@ void menuchange() {
 }
 
 void menudisplay()  {
-  lcd.clear();
+  //lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Weld Time | Temp");
+  lcd.print("Weld time |Temp.");
   lcd.setCursor(0, 1);
   lcd.print(weldtime);
-  lcd.print(" ms");
+  lcd.print(" ms   ");
   lcd.setCursor(10, 1);
-  lcd.print("|  ");
-  lcd.print(int(Thermistor(analogRead(thermpin))));
-  lcd.print("C");
-  delay (200);
+  lcd.print("|");
+  lcd.print(round(Thermistor(analogRead(thermpin))));
+  lcd.print("C   ");
+  delay (100);
 }
 
 void weld() {
@@ -94,23 +93,44 @@ void weld() {
 }
 
 void cooldown() {
-  while (int(Thermistor(analogRead(thermpin))) > resumetemp)  {
-    lcd.clear();
+  lcd.clear();
+  while (round(Thermistor(analogRead(thermpin))) > resumetemp)  {
     lcd.setCursor(0, 0);
-    lcd.print("Cooling...| Temp");
+    lcd.print("Cooling...|Temp.");
     lcd.setCursor(10, 1);
-    lcd.print("|  ");
-    lcd.print(int(Thermistor(analogRead(thermpin))));
-    lcd.print("C");
-    delay(1000);
+    lcd.print("|");
+    lcd.print(round(Thermistor(analogRead(thermpin))));
+    lcd.print("C   ");
+    delay(500);
   }
   menudisplay();
 }
 
+double Thermistor1(int RawADC) {
+  double Temp;
+  // Temp = log(100000.0 * ((1023.0 / RawADC - 1)));
+  Temp = log(100000.0 / (1023.0 / RawADC - 1)); // for pull-up configuration
+  Temp = 1.0 / (0.0008271111 + (0.000208802 + (0.000000080592 * Temp * Temp )) * Temp );
+  Temp = Temp - 273.15; // Convert Kelvin to Celsius - Temp = (Temp * 9.0)/ 5.0 + 32.0; for convert Celsius to Fahrenheit
+  return Temp;
+}
+
 double Thermistor(int RawADC) {
   double Temp;
-  Temp = log(10000.0 * ((1024.0 / RawADC - 1))); // log(10000.0 / (1024.0 / RawADC - 1))) for pull-up configuration
-  Temp = 1 / (0.001129148 + (0.000234125 + (0.0000000876741 * Temp * Temp )) * Temp );
+  // Temp = log(10000.0 * ((1023.0 / RawADC - 1)));
+  Temp = log(10000.0 / (1023.0 / RawADC - 1)); // for pull-up configuration
+  Temp = 1.0 / (0.001129241 + (0.0002341077 + (0.00000008775468 * Temp * Temp )) * Temp );
   Temp = Temp - 273.15; // Convert Kelvin to Celsius - Temp = (Temp * 9.0)/ 5.0 + 32.0; for convert Celsius to Fahrenheit
+  return Temp;
+}
+
+double Thermistor2(int RawADC)	{
+  double Temp;
+  Temp = RawADC / (1023.00 - RawADC);	// (R/Ro)
+  Temp = log(Temp);            			// ln(R/Ro)
+  Temp /= 3950.0;         			    // 1/B * ln(R/Ro)
+  Temp += 1.0 / (25.0 + 273.15);		// + (1/To)
+  Temp = 1.0 / Temp;       			    // Invert
+  Temp -= 273.15;           		    // convert to C
   return Temp;
 }
