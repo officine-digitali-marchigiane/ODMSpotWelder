@@ -2,13 +2,14 @@
 #include <math.h> // standard library used for temperature calculations
 //#include <LiquidCrystal_I2C.h> // for I2C, you need the new library installed (the link is just below)
 #include <LiquidCrystal.h>
+#include "OneButton.h"
 
 #define DEBUG_MODE
 
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
-int menupin = 7;
+//int menupin = 7;
 int switchpin = 8;
-int weldbuttonpin = 6;
+//int weldbuttonpin = 6;
 int thermpin = 0;
 int preweld = 50;
 int postprepause = 400;
@@ -23,11 +24,18 @@ int weldtime = 0;
 int cutofftemp = 80;
 int resumetemp = 40;
 
+OneButton btnWeld(A6, true,true);
+OneButton btnMenu(A7, true,true);
+
 void setup() {
   pinMode(switchpin, OUTPUT);
-  pinMode(weldbuttonpin, INPUT_PULLUP);
-  pinMode(menupin, INPUT_PULLUP);
+  //pinMode(weldbuttonpin, INPUT_PULLUP); 
+  //pinMode(menupin, INPUT_PULLUP);
   pinMode(thermpin, INPUT);
+  
+  btnWeld.attachClick(weld);
+  btnMenu.attachClick(menuchange);
+  
   Serial.begin(9600);
   maxweldpulse = (maxweldpulse - weldtimeincrement);
   weldtime = weldtimeincrement;
@@ -42,14 +50,8 @@ void loop() {
   if (round(Thermistor(analogRead(thermpin))) >= cutofftemp)  {
     cooldown();
   }
-  if (digitalRead(menupin) == LOW)  {
-    delay(debouncepause);
-    menuchange();
-  }
-  if (digitalRead(weldbuttonpin) == LOW)  {
-    delay(debouncepause);
-    weld();
-  }
+  btnMenu.tick();
+  btnWeld.tick();
   menudisplay();
 }
 
