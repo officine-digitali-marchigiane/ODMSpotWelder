@@ -3,9 +3,20 @@
 //#include <LiquidCrystal_I2C.h> // for I2C, you need the new library installed (the link is just below)
 #include <LiquidCrystal.h>
 #include "OneButton.h"
-//#define DEBUG_MODE
+
+#define DEBUG_MODE
 
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+byte customChar[8] = {
+  0b00110,
+  0b01001,
+  0b01001,
+  0b00110,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000
+};
 int menupin = 7;
 int switchpin = 8;
 int weldbuttonpin = 6;
@@ -18,7 +29,7 @@ int maxweldpulse = 1000;
 #else
 int maxweldpulse = 250;
 #endif
-int debouncepause = 200;
+//int debouncepause = 200;
 int weldtime = 0;
 int cutofftemp = 80;
 int resumetemp = 40;
@@ -44,14 +55,12 @@ void setup() {
   weldButton.attachClick(weld);
   weldButton.setDebounceTicks(20); // default=50
   weldButton.setClickTicks(100); // default=600
+  lcd.createChar(0, customChar);
   lcd.begin(16, 2);
   menudisplay();
 }
 
 void loop() {
-#ifdef DEBUG_MODE
-  Serial.println(ThermistorRead(thermpin));
-#endif
   if (ThermistorRead(thermpin) >= cutofftemp)  {
     cooldown();
   }
@@ -81,21 +90,23 @@ void menuchange() {
 void menudisplay()  {
   //lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Weld time|Temp.");
+  lcd.print(F("Weld time|Temp."));
   lcd.setCursor(0, 1);
   lcd.print(weldtime);
-  lcd.print(" ms  ");
+  lcd.print(F(" ms  "));
   lcd.setCursor(9, 1);
-  lcd.print("|");
-  lcd.print(ThermistorRead(thermpin));
-  lcd.print("C ");
-  //delay (100);
+  lcd.print(F("|"));
+  lcd.print((int)ThermistorRead(thermpin));
+  lcd.print(F(" "));
+  lcd.write((byte)0);
+  lcd.print(F("C  "));
+  delay (10);
 }
 
 void weld() {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Welding...");
+  lcd.print(F("Welding..."));
   preweld = 0.2 * weldtime;
   digitalWrite(switchpin, HIGH);
   delay(preweld);
@@ -111,56 +122,45 @@ void cooldown() {
   lcd.clear();
   while (ThermistorRead(thermpin) > resumetemp)  {
     lcd.setCursor(0, 0);
-    lcd.print("Cooling..|Temp.");
+    lcd.print(F("Cooling..|Temp."));
     lcd.setCursor(9, 1);
-    lcd.print("|");
-    lcd.print(ThermistorRead(thermpin));
-    lcd.print("C ");
+    lcd.print(F("|"));
+    lcd.print((int)ThermistorRead(thermpin));
+	lcd.print(F(" "));
+    lcd.write((byte)0);
+    lcd.print(F("C  "));
     delay(10);
   }
   menudisplay();
 }
 
 float ThermistorRead(int pin)	{
-#define NUMSAMPLES 5
+#define OVERSAMPLES 16
+#define EXTRA_BITS 2	// OVERSAMPLES = pow(4, EXTRA_BITS)
   byte i;
-  int sample;
-  float average = 0.0;
+  uint16_t oversample = 0;
+  float Temp;
  
-  for (i=0; i<NUMSAMPLES; i++) {
-	sample = analogRead(pin);
-	average += sample;
-	delay(10);
+  for (i=0; i<OVERSAMPLES; i++) {
+	oversample += analogRead(pin);
   }
-  average /= NUMSAMPLES;
-  return ADC2Temp2(average);
-}
-
-float ADC2Temp(int RawADC) {
-  float Temp;
-  // Temp = log(100000.0 * ((1023.0 / RawADC - 1)));
-  Temp = log(100000.0 / (1023.0 / RawADC - 1)); // for pull-up configuration
-  Temp = 1.0 / (0.0008271111 + (0.000208802 + (0.000000080592 * Temp * Temp )) * Temp );
-  Temp = Temp - 273.15; // Convert Kelvin to Celsius - Temp = (Temp * 9.0)/ 5.0 + 32.0; for convert Celsius to Fahrenheit
+  oversample >>= EXTRA_BITS;
+  Temp = ADC2Temp(oversample);
+#ifdef DEBUG_MODE
+  Serial.println(Temp);
+#endif
   return Temp;
 }
 
-float ADC2Temp1(int RawADC) {
+float ADC2Temp(int RawADC)	{
+#define MAX_VIRT_ADC 4092.0
+#define ONE_OVER_T0 0.0028316579357214 // 1.0 / (80.0 + 273.15)
   float Temp;
-  // Temp = log(10000.0 * ((1023.0 / RawADC - 1)));
-  Temp = log(10000.0 / (1023.0 / RawADC - 1)); // for pull-up configuration
-  Temp = 1.0 / (0.001129241 + (0.0002341077 + (0.00000008775468 * Temp * Temp )) * Temp );
-  Temp = Temp - 273.15; // Convert Kelvin to Celsius - Temp = (Temp * 9.0)/ 5.0 + 32.0; for convert Celsius to Fahrenheit
-  return Temp;
-}
-
-float ADC2Temp2(int RawADC)	{
-  float Temp;
-  Temp = RawADC / (1023.00 - RawADC);	// (R/Ro)
-  Temp = log(Temp);            			// ln(R/Ro)
-  Temp /= 3950.0;         			    // 1/B * ln(R/Ro)
-  Temp += 1.0 / (25.0 + 273.15);		// + (1/To)
-  Temp = 1.0 / Temp;       			    // Invert
-  Temp -= 273.15;           		    // convert to C
+  Temp = 12000.0 / (MAX_VIRT_ADC / RawADC - 1.0);	// R
+  Temp = log(Temp / 12540.0);						// ln(R/Ro)
+  Temp /= 3950.0;         					    	// 1/B * ln(R/Ro)
+  Temp += ONE_OVER_T0;								// + (1/To)
+  Temp = 1.0 / Temp;       			   				// Invert
+  Temp -= 273.15;           		   				// convert to C
   return Temp;
 }
